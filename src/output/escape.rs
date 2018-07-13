@@ -1,25 +1,28 @@
 use ansi_term::{ANSIString, Style};
 
+static BLACKLIST: &str = "'\"!?\\/`´&$(){}[]<>~|;*";
 
-pub fn escape<'a>(string: String, bits: &mut Vec<ANSIString<'a>>, good: Style, bad: Style) {
-    if string.chars().all(|c| c >= 0x20 as char) {
+fn blacklisted(ch: char) -> bool {
+    ch.is_control() || ch.is_whitespace() || BLACKLIST.contains(ch)
+}
+
+pub fn escape<'a>(string: String, bits: &mut Vec<ANSIString<'a>>, good: Style, _bad: Style) {
+    if !string.contains(blacklisted) {
         bits.push(good.paint(string));
-    }
-    else {
-        for c in string.chars() {
-            // The `escape_default` method on `char` is *almost* what we want here, but
-            // it still escapes non-ASCII UTF-8 characters, which are still printable.
-
-            if c >= 0x20 as char {
-                // TODO: This allocates way too much,
-                // hence the `all` check above.
-                let mut s = String::new();
-                s.push(c);
-                bits.push(good.paint(s));
-            } else {
-                let s = c.escape_default().collect::<String>();
-                bits.push(bad.paint(s));
+    } else {
+        let mut str_buffer = String::with_capacity(string.len() + 2);
+        str_buffer.push('\'');
+        for ch in string.chars() {
+            match ch {
+                '\'' => {
+                    str_buffer.push_str("'\\");
+                    str_buffer.push(ch);
+                    str_buffer.push('\'');
+                },
+                _ => str_buffer.push(ch),
             }
         }
+        str_buffer.push('\'');
+        bits.push(good.paint(str_buffer));
     }
 }
